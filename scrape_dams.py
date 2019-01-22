@@ -3,6 +3,7 @@ import os
 import time
 
 from selenium import webdriver
+from bs4 import BeautifulSoup
 
 PRIMARY_URL = "http://nid.usace.army.mil/cm_apex/f?p=838:4:0::NO"
 TABLE_PATH = 'table.csv'
@@ -58,24 +59,26 @@ def main():
         print('search')
         driver.execute_script("javascript:gReport.search('SEARCH',100000)")
         print('executed 100000 search')
-        time.sleep(5)
+        time.sleep(3)
         driver.save_screenshot(f"screenshot7_{state_code}.png")
         print("loading table via xpath")
-        table_element = driver.find_element_by_xpath(
-            "//table[@class='apexir_WORKSHEET_DATA']")
+        bs_table_rows = BeautifulSoup(
+            driver.page_source, 'html.parser').select(
+                'table.apexir_WORKSHEET_DATA tr')
         print("loaded table doc from a string")
+        print(bs_table_rows)
         with open(TABLE_PATH, 'a') as table_file:
-            for row_index, table_row in enumerate(
-                    table_element.find_elements_by_xpath(".//tr")):
+            for row_index, table_row in enumerate(bs_table_rows):
                 if not wrote_header:
-                    for col in table_row.find_elements_by_xpath(".//th"):
+                    for col in table_row.find_all('th'):
                         table_file.write(f'{col.text},')
                     table_file.write('\n')
                     wrote_header = True
+                    continue
 
                 if row_index % 100 == 0:
                     print(f'{state_code}, {row_index}')
-                for col in table_row.find_elements_by_xpath(".//td"):
+                for col in table_row.find_all('td'):
                     table_file.write(f'{col.text},')
                 table_file.write('\n')
 
