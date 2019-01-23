@@ -10,12 +10,15 @@ from selenium import webdriver
 from selenium.webdriver.firefox.options import Options
 from selenium.common.exceptions import StaleElementReferenceException
 from selenium.common.exceptions import NoSuchElementException
+from selenium.common.exceptions import WebDriverException
 from bs4 import BeautifulSoup
 
 PRIMARY_URL = "http://nid.usace.army.mil/cm_apex/f?p=838:4:0::NO"
 TABLE_PATH = 'table.csv'
 N_WORKERS = 8
 N_RESULTS = 10000
+SMALL_DELAY = 5.0
+LARGE_DELAY = 30.0
 LOGGER = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
 
@@ -24,7 +27,9 @@ def search_state(work_queue, write_queue):
     """Search for state `state_code` and dumps result to `work_queue`."""
     firefox_options = Options()
     firefox_options.headless = True
-    with webdriver.Firefox(options=firefox_options) as driver:
+
+    while True:
+        driver = webdriver.Firefox(options=firefox_options)
         driver.implicitly_wait(10)
         driver.get(PRIMARY_URL)
         el = driver.find_element_by_id('P12_ORGANIZATION')
@@ -36,70 +41,36 @@ def search_state(work_queue, write_queue):
         LOGGER.info('click NID Interactive Report')
         link = driver.find_element_by_link_text('NID Interactive Report')
         link.click()
+        state_code = work_queue.get()
+        if state_code == 'STOP':
+            break
 
-        while True:
-            state_code = work_queue.get()
-            if state_code == 'STOP':
-                break
-
-            try:
-                delete_filter_element = driver.find_element_by_xpath(
-                    "//a[contains(@onclick, 'gReport.column.filter_delete')]")
-                if delete_filter_element:
-                    LOGGER.info("deleting old filter")
-                    # search only 1 so delete doesn't take a long time
-                    driver.execute_script(
-                        "javascript:gReport.search('SEARCH',1)")
-                    time.sleep(1.0)
-                    # we have to refind the element after the search because
-                    # it is stale
-                    delete_filter_element = driver.find_element_by_xpath(
-                        "//a[contains(@onclick, 'gReport.column.filter_delete')]//img")
-                    delete_filter_element.click()
-                    while True:
-                        # ensure that filter has been removed
-                        _ = driver.find_element_by_xpath(
-                            "//a[contains(@onclick, 'gReport.column.filter_delete')]//img")
-                        time.sleep(0.1)
-                    driver.save_screenshot(f"cleared_filter_{state_code}.png")
-            except NoSuchElementException:
-                pass
-
-            LOGGER.info('click search')
-            time.sleep(0.1)
-            search_link = driver.find_element_by_id('apexir_SEARCHDROPROOT')
-            search_link.click()
-            time.sleep(0.1)
-            el = driver.find_element_by_id('apexir_columnsearch')
-            el.find_element_by_id('STATE').click()
-            LOGGER.info('click STATE')
-            time.sleep(0.1)
-            LOGGER.info(f'type {state_code}')
-            input_box = driver.find_element_by_id('apexir_SEARCH')
-            input_box.clear()
-            input_box.send_keys(state_code)
-            time.sleep(0.1)
-            driver.execute_script(
-                f"javascript:gReport.search('SEARCH',{N_RESULTS})")
-            time.sleep(5.0)
-            LOGGER.info(f'executed {N_RESULTS} search')
-            while True:
-                try:
-                    table_element = driver.find_element_by_xpath(
-                        "//table[@class='apexir_WORKSHEET_DATA']")
-                    bs_table_rows = BeautifulSoup(table_element.get_attribute(
-                        'outerHTML'), 'html.parser').select(
-                            'table.apexir_WORKSHEET_DATA tr')
-                    break
-                except StaleElementReferenceException:
-                    LOGGER.info('stale element, trying again')
-                    time.sleep(0.5)
-                except NoSuchElementException:
-                    LOGGER.exception('no such element, writing screenshot')
-                    driver.save_screenshot(f'nosuch_element_{state_code}.png')
-                    raise
-            driver.save_screenshot(f"post_search_{state_code}.png")
-            write_queue.put((bs_table_rows, state_code))
+        LOGGER.info('click search')
+        time.sleep(SMALL_DELAY)
+        search_link = driver.find_element_by_id('apexir_SEARCHDROPROOT')
+        search_link.click()
+        time.sleep(SMALL_DELAY)
+        el = driver.find_element_by_id('apexir_columnsearch')
+        el.find_element_by_id('STATE').click()
+        LOGGER.info('click STATE')
+        time.sleep(SMALL_DELAY)
+        LOGGER.info(f'type {state_code}')
+        input_box = driver.find_element_by_id('apexir_SEARCH')
+        input_box.clear()
+        input_box.send_keys(state_code)
+        time.sleep(SMALL_DELAY)
+        driver.execute_script(
+            f"javascript:gReport.search('SEARCH',{N_RESULTS})")
+        time.sleep(LARGE_DELAY)
+        LOGGER.info(f'executed {state_code} {N_RESULTS} search')
+        table_element = driver.find_element_by_xpath(
+            "//table[@class='apexir_WORKSHEET_DATA']")
+        bs_table_rows = BeautifulSoup(table_element.get_attribute(
+            'outerHTML'), 'html.parser').select(
+                'table.apexir_WORKSHEET_DATA tr')
+        write_queue.put((bs_table_rows, state_code))
+        driver.save_screenshot(f"post_search_{state_code}.png")
+        driver.close()
 
 
 def writer(target_table_path, work_queue):
