@@ -12,7 +12,7 @@ from bs4 import BeautifulSoup
 
 PRIMARY_URL = "http://nid.usace.army.mil/cm_apex/f?p=838:4:0::NO"
 TABLE_PATH = 'table.csv'
-N_WORKERS = 4
+N_WORKERS = 8
 N_RESULTS = 10000
 SMALL_DELAY = 3.0
 LARGE_DELAY = 25.0
