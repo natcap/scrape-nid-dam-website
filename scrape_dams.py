@@ -15,6 +15,7 @@ from bs4 import BeautifulSoup
 PRIMARY_URL = "http://nid.usace.army.mil/cm_apex/f?p=838:4:0::NO"
 TABLE_PATH = 'table.csv'
 N_WORKERS = 8
+N_RESULTS = 10000
 LOGGER = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
 
@@ -44,18 +45,16 @@ def search_state(work_queue, write_queue):
         try:
             delete_filter_element = driver.find_element_by_xpath(
                 "//a[contains(@onclick, 'gReport.column.filter_delete')]")
-            LOGGER.info(delete_filter_element)
             if delete_filter_element:
                 LOGGER.info("deleting old filter")
                 driver.execute_script("javascript:gReport.search('SEARCH',1)")
-                time.sleep(0.5)
+                time.sleep(1.0)
                 delete_filter_element = driver.find_element_by_xpath(
                     "//a[contains(@onclick, 'gReport.column.filter_delete')]//img")
                 delete_filter_element.click()
-                time.sleep(0.5)
+                time.sleep(1.0)
                 driver.save_screenshot(f"cleared_filter_{state_code}.png")
         except NoSuchElementException:
-            LOGGER.exception("no such element")
             pass
 
         LOGGER.info('click search')
@@ -72,9 +71,10 @@ def search_state(work_queue, write_queue):
         input_box.clear()
         input_box.send_keys(state_code)
         time.sleep(0.1)
-        driver.execute_script("javascript:gReport.search('SEARCH',100)")
+        driver.execute_script(
+            f"javascript:gReport.search('SEARCH',{N_RESULTS})")
         time.sleep(5.0)
-        LOGGER.info('executed 100000 search')
+        LOGGER.info(f'executed {N_RESULTS} search')
         driver.save_screenshot(f"post_search_{state_code}.png")
         while True:
             try:
@@ -87,6 +87,9 @@ def search_state(work_queue, write_queue):
             except StaleElementReferenceException:
                 LOGGER.info('stale element, trying again')
                 time.sleep(0.5)
+            except NoSuchElementException:
+                LOGGER.exception('no such element, writing screenshot')
+                driver.save_screenshot(f'nosuch_element_{state_code}.png')
         write_queue.put((bs_table_rows, state_code))
     driver.quit()
 
