@@ -8,17 +8,14 @@ import time
 
 from selenium import webdriver
 from selenium.webdriver.firefox.options import Options
-from selenium.common.exceptions import StaleElementReferenceException
-from selenium.common.exceptions import NoSuchElementException
-from selenium.common.exceptions import WebDriverException
 from bs4 import BeautifulSoup
 
 PRIMARY_URL = "http://nid.usace.army.mil/cm_apex/f?p=838:4:0::NO"
 TABLE_PATH = 'table.csv'
-N_WORKERS = 8
+N_WORKERS = 4
 N_RESULTS = 10000
-SMALL_DELAY = 5.0
-LARGE_DELAY = 30.0
+SMALL_DELAY = 3.0
+LARGE_DELAY = 25.0
 LOGGER = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
 
@@ -29,6 +26,10 @@ def search_state(work_queue, write_queue):
     firefox_options.headless = True
 
     while True:
+        state_code = work_queue.get()
+        if state_code == 'STOP':
+            break
+
         driver = webdriver.Firefox(options=firefox_options)
         driver.implicitly_wait(10)
         driver.get(PRIMARY_URL)
@@ -41,12 +42,24 @@ def search_state(work_queue, write_queue):
         LOGGER.info('click NID Interactive Report')
         link = driver.find_element_by_link_text('NID Interactive Report')
         link.click()
-        state_code = work_queue.get()
-        if state_code == 'STOP':
-            break
 
+        # make small number of searches so the next part goes faster
+        driver.execute_script(f"javascript:gReport.search('SEARCH',1)")
         LOGGER.info('click search')
         time.sleep(SMALL_DELAY)
+
+        # add all columns
+        LOGGER.info("show column dialog")
+        driver.execute_script(
+            "javascript:gReport.dialog2('SHOW_COLUMN','COLUMN')")
+        time.sleep(SMALL_DELAY)
+        LOGGER.info("add all columns")
+        driver.execute_script("javascript:g_Shuttlep_v01.move_all()")
+        time.sleep(SMALL_DELAY)
+        LOGGER.info("commit the column change")
+        driver.execute_script("javascript:gReport.column.display()")
+        time.sleep(SMALL_DELAY)
+
         search_link = driver.find_element_by_id('apexir_SEARCHDROPROOT')
         search_link.click()
         time.sleep(SMALL_DELAY)
@@ -59,6 +72,7 @@ def search_state(work_queue, write_queue):
         input_box.clear()
         input_box.send_keys(state_code)
         time.sleep(SMALL_DELAY)
+
         driver.execute_script(
             f"javascript:gReport.search('SEARCH',{N_RESULTS})")
         time.sleep(LARGE_DELAY)
