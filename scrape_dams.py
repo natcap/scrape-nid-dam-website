@@ -83,7 +83,6 @@ def search_state(work_queue, write_queue):
                 f"javascript:gReport.search('SEARCH',{N_RESULTS})")
             time.sleep(5.0)
             LOGGER.info(f'executed {N_RESULTS} search')
-            driver.save_screenshot(f"post_search_{state_code}.png")
             while True:
                 try:
                     table_element = driver.find_element_by_xpath(
@@ -98,6 +97,8 @@ def search_state(work_queue, write_queue):
                 except NoSuchElementException:
                     LOGGER.exception('no such element, writing screenshot')
                     driver.save_screenshot(f'nosuch_element_{state_code}.png')
+                    raise
+            driver.save_screenshot(f"post_search_{state_code}.png")
             write_queue.put((bs_table_rows, state_code))
 
 
