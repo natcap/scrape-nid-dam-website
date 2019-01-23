@@ -69,7 +69,7 @@ def search_state(work_queue, write_queue):
             'outerHTML'), 'html.parser').select(
                 'table.apexir_WORKSHEET_DATA tr')
         write_queue.put((bs_table_rows, state_code))
-        driver.save_screenshot(f"post_search_{state_code}.png")
+        #driver.save_screenshot(f"post_search_{state_code}.png")
         driver.close()
 
 
@@ -88,15 +88,17 @@ def writer(target_table_path, work_queue):
                 break
             bs_table_rows, state_code = payload
             for row_index, table_row in enumerate(bs_table_rows):
-                if not wrote_header:
-                    csv_writer.writerow(
-                        [col.text for col in table_row.find_all('th')])
-                    wrote_header = True
-                    continue
                 if row_index % 100 == 0:
                     LOGGER.info(f'{state_code}, {row_index}')
-                csv_writer.writerow(
-                        [col.text for col in table_row.find_all('td')])
+                if not wrote_header:
+                    row_element_text = [
+                        col.text for col in table_row.find_all('th')]
+                    wrote_header = True
+                else:
+                    row_element_text = [
+                        col.text for col in table_row.find_all('td')]
+                if row_element_text:
+                    csv_writer.writerow(row_element_text)
 
 
 def main():
