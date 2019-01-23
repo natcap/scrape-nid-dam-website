@@ -56,7 +56,11 @@ def search_state(work_queue, write_queue):
                     delete_filter_element = driver.find_element_by_xpath(
                         "//a[contains(@onclick, 'gReport.column.filter_delete')]//img")
                     delete_filter_element.click()
-                    time.sleep(1.0)
+                    while True:
+                        # ensure that filter has been removed
+                        _ = driver.find_element_by_xpath(
+                            "//a[contains(@onclick, 'gReport.column.filter_delete')]//img")
+                        time.sleep(0.1)
                     driver.save_screenshot(f"cleared_filter_{state_code}.png")
             except NoSuchElementException:
                 pass
