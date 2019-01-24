@@ -8,7 +8,7 @@ import time
 
 from selenium import webdriver
 from selenium.webdriver.firefox.options import Options
-from selenium.common.exceptions
+import selenium.common.exceptions
 from bs4 import BeautifulSoup
 
 PRIMARY_URL = "http://nid.usace.army.mil/cm_apex/f?p=838:4:0::NO"
