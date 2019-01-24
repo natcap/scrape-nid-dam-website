@@ -8,6 +8,7 @@ import time
 
 from selenium import webdriver
 from selenium.webdriver.firefox.options import Options
+from selenium.common.exceptions
 from bs4 import BeautifulSoup
 
 PRIMARY_URL = "http://nid.usace.army.mil/cm_apex/f?p=838:4:0::NO"
@@ -77,13 +78,16 @@ def search_state(work_queue, write_queue):
             f"javascript:gReport.search('SEARCH',{N_RESULTS})")
         time.sleep(LARGE_DELAY)
         LOGGER.info(f'executed {state_code} {N_RESULTS} search')
-        table_element = driver.find_element_by_xpath(
-            "//table[@class='apexir_WORKSHEET_DATA']")
-        bs_table_rows = BeautifulSoup(table_element.get_attribute(
-            'outerHTML'), 'html.parser').select(
-                'table.apexir_WORKSHEET_DATA tr')
-        write_queue.put((bs_table_rows, state_code))
-        #driver.save_screenshot(f"post_search_{state_code}.png")
+        try:
+            table_element = driver.find_element_by_xpath(
+                "//table[@class='apexir_WORKSHEET_DATA']")
+            bs_table_rows = BeautifulSoup(table_element.get_attribute(
+                'outerHTML'), 'html.parser').select(
+                    'table.apexir_WORKSHEET_DATA tr')
+            write_queue.put((bs_table_rows, state_code))
+        except selenium.common.exceptions.NoSuchElementException:
+            driver.save_screenshot(f"exception on {state_code}.png")
+            LOGGER.exception(f"exception on state {state_code}")
         driver.close()
 
 
